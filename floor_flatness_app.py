@@ -737,7 +737,8 @@ if xyz is not None:
         else:
             vis_idx = np.arange(len(floor_pts))
 
-        exag = st.slider("Z 과장 배율 (높낮이 강조)", min_value=1, max_value=500,
+        EXAG_MAX = 500
+        exag = st.slider("Z 과장 배율 (높낮이 강조)", min_value=1, max_value=EXAG_MAX,
                           value=100, step=10,
                           help="실제 편차는 mm 단위라 육안으로 안 보임. 배율을 높이면 높낮이가 강조됨")
 
@@ -754,6 +755,15 @@ if xyz is not None:
                 zi_signed, method_signed = safe_griddata((x, y), signed_mm, np.meshgrid(xi_s, yi_s))
                 zi_abs_s, method_abs = safe_griddata((x, y), abs_mm, np.meshgrid(xi_s, yi_s))
 
+                # z축 표시 범위를 "슬라이더 최댓값 기준"으로 고정한다. 그렇지 않으면
+                # Plotly가 aspectmode="manual" 박스 안에 항상 꽉 차도록 자동으로
+                # 재조정해버려서, exag를 바꿔도 모양이 똑같아 보이고 축 눈금 숫자만
+                # 바뀌는 문제가 있었다(과장 배율 슬라이더가 시각적으로 무의미해짐).
+                raw_max_mm = np.nanmax(np.abs(zi_signed))
+                if not np.isfinite(raw_max_mm) or raw_max_mm < 1e-9:
+                    raw_max_mm = 1.0
+                fixed_range_m = raw_max_mm * EXAG_MAX / 1000
+
                 fig_surf = go.Figure(go.Surface(
                     x=xi_s, y=yi_s,
                     z=zi_signed * exag / 1000,   # mm → m 변환 후 과장
@@ -765,7 +775,7 @@ if xyz is not None:
                 fig_surf.update_layout(
                     scene=dict(
                         xaxis_title="X (m)", yaxis_title="Y (m)",
-                        zaxis_title=f"편차 (×{exag} 과장)",
+                        zaxis=dict(title=f"편차 (×{exag} 과장)", range=[-fixed_range_m, fixed_range_m]),
                         aspectmode="manual",
                         aspectratio=dict(x=1, y=1, z=0.4)
                     ),
