@@ -398,11 +398,20 @@ def point_to_plane_dist(points, plane):
     return (a * points[:, 0] + b * points[:, 1] + c * points[:, 2] + d) / np.sqrt(a**2 + b**2 + c**2)
 
 
+@st.cache_data(show_spinner=False)
 def safe_griddata(xy, values, mesh):
     """선형 보간이 실패(일직선/삼각분할 불가 등)하면 nearest로 재시도한다.
 
     Returns:
         (보간 결과, 실제 사용된 method 문자열 "linear" | "nearest")
+
+    `st.cache_data`로 캐싱한다: 이 함수는 대규모 점군(수만~수십만 점)에서
+    Qhull 삼각분할 비용이 커서 느린데, session_state로 분석 결과를 유지하는
+    방식(Phase 10.9)으로 바꾼 뒤에는 Z 과장 배율 슬라이더처럼 이 결과와
+    무관한 위젯을 조작해도 화면 전체가 매번 재실행되면서 이 함수도 매번
+    다시 호출됐다. 캐싱 없이는 실제 대규모 데이터에서 위젯을 조작할 때마다
+    무거운 보간을 반복 실행해 배포 서버가 응답 없음으로 죽는 원인이 됐다.
+    입력(xy, values, mesh)이 그대로면 캐시를 재사용해 즉시 반환된다.
     """
     x, y = xy
     try:
@@ -765,7 +774,9 @@ if xyz is not None:
 
         VIS_MAX = 50_000
         if len(floor_pts) > VIS_MAX:
-            vis_idx = np.random.choice(len(floor_pts), VIS_MAX, replace=False)
+            # 시드를 고정해 같은 분석 결과에 대해서는 위젯을 조작해도(예: Z 과장
+            # 배율 슬라이더) 매번 재실행 때마다 다른 점이 뽑히지 않도록 한다.
+            vis_idx = np.random.default_rng(42).choice(len(floor_pts), VIS_MAX, replace=False)
             st.caption(f"⚡ 시각화: {len(floor_pts):,}개 → {VIS_MAX:,}개로 자동 샘플링 (분석은 전체 데이터 사용)")
         else:
             vis_idx = np.arange(len(floor_pts))
