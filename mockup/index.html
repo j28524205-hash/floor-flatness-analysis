@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>바닥면 평탄성 분석 — UI Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#081420;
+    --bg-1:#0b1e30;
+    --bg-2:#0f2740;
+    --grid-line:rgba(110,190,255,.07);
+    --grid-line-strong:rgba(110,190,255,.14);
+    --ink:#e7f1fb;
+    --ink-dim:#8fa9c7;
+    --ink-faint:#5d7a9b;
+    --border:rgba(143,168,196,.22);
+    --border-strong:rgba(143,168,196,.4);
+    --cyan:#48d8f0;
+    --cyan-dim:#2a8fa8;
+    --amber:#ffb648;
+    --safety:#ff6a45;
+    --grade-a:#3ee08a;
+    --grade-b1:#ffa53d;
+    --grade-b2:#4fa3ff;
+    --grade-c:#ff5577;
+    --mono:'IBM Plex Mono',monospace;
+    --sans:'IBM Plex Sans KR','IBM Plex Sans',sans-serif;
+    --disp:'Big Shoulders','IBM Plex Sans KR',sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/48px 48px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/48px 48px,
+      radial-gradient(1200px 700px at 15% -10%, #123456 0%, transparent 60%),
+      radial-gradient(900px 600px at 110% 10%, #0e2f42 0%, transparent 55%),
+      var(--bg-0);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* ---------- decorative corner ticks ---------- */
+  .ruler-v, .ruler-h{position:fixed; z-index:2; pointer-events:none; opacity:.5;}
+  .ruler-v{left:0; top:0; bottom:0; width:22px; background-image:repeating-linear-gradient(to bottom, var(--border-strong) 0, var(--border-strong) 1px, transparent 1px, transparent 40px);}
+  .ruler-h{top:0; left:0; right:0; height:22px; background-image:repeating-linear-gradient(to right, var(--border-strong) 0, var(--border-strong) 1px, transparent 1px, transparent 40px);}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:16px;
+    padding:14px 28px 14px 40px;
+    background:linear-gradient(180deg, rgba(8,20,32,.96), rgba(8,20,32,.85));
+    border-bottom:1px solid var(--border);
+    backdrop-filter:blur(6px);
+  }
+  .mark{
+    width:34px; height:34px; flex:none; position:relative;
+    border:2px solid var(--cyan); border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    transform:rotate(45deg);
+  }
+  .mark::after{content:'';width:10px;height:10px;background:var(--cyan);transform:rotate(-45deg);box-shadow:0 0 12px var(--cyan);}
+  .topbar h1{
+    font-family:var(--disp); font-weight:700; font-size:20px; letter-spacing:.03em;
+    margin:0; text-transform:uppercase; color:var(--ink);
+  }
+  .topbar .sub{font-family:var(--mono); font-size:11px; color:var(--ink-faint); letter-spacing:.08em; text-transform:uppercase;}
+  .topbar-right{margin-left:auto; display:flex; align-items:center; gap:10px;}
+  .tag{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+    padding:5px 10px; border:1px solid var(--safety); color:var(--safety); border-radius:3px;
+    background:rgba(255,106,69,.08);
+  }
+  .tag.status{border-color:var(--grade-a); color:var(--grade-a); background:rgba(62,224,138,.08);}
+  .scanbar{position:relative; height:2px; overflow:hidden; background:rgba(255,255,255,.03);}
+  .scanbar::after{
+    content:''; position:absolute; top:0; bottom:0; width:120px; left:-120px;
+    background:linear-gradient(90deg, transparent, var(--cyan), transparent);
+    animation:scan 3.6s linear infinite;
+  }
+  @keyframes scan{to{left:110%;}}
+
+  main{max-width:1180px; margin:0 auto; padding:44px 32px 100px;}
+
+  .hero{margin-bottom:42px;}
+  .hero .eyebrow{
+    font-family:var(--mono); font-size:12px; color:var(--cyan); letter-spacing:.16em; text-transform:uppercase;
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .hero .eyebrow::before{content:''; width:26px; height:1px; background:var(--cyan);}
+  .hero h2{
+    font-family:var(--disp); font-weight:900; font-size:clamp(32px,4.4vw,52px);
+    line-height:1.05; margin:0 0 14px; letter-spacing:.01em;
+  }
+  .hero h2 span{color:var(--cyan);}
+  .hero p{color:var(--ink-dim); font-size:15px; max-width:640px; line-height:1.7; margin:0;}
+  .hero .specs{
+    display:flex; gap:28px; margin-top:26px; flex-wrap:wrap;
+    font-family:var(--mono); font-size:12px; color:var(--ink-faint);
+  }
+  .hero .specs b{color:var(--ink); font-weight:600;}
+
+  /* ---------- section frame ---------- */
+  .panel{
+    position:relative;
+    border:1px solid var(--border);
+    background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)), var(--bg-1);
+    border-radius:6px;
+    padding:26px 28px;
+    margin-bottom:26px;
+    opacity:0; transform:translateY(14px);
+    animation:rise .6s ease forwards;
+  }
+  .panel::before,.panel::after,
+  .panel .cbl,.panel .cbr{
+    content:''; position:absolute; width:12px; height:12px; border:2px solid var(--cyan-dim); opacity:.7;
+  }
+  .panel::before{top:-1px; left:-1px; border-right:none; border-bottom:none;}
+  .panel::after{top:-1px; right:-1px; border-left:none; border-bottom:none;}
+  .panel .cbl{bottom:-1px; left:-1px; border-right:none; border-top:none;}
+  .panel .cbr{bottom:-1px; right:-1px; border-left:none; border-top:none;}
+  @keyframes rise{to{opacity:1; transform:translateY(0);}}
+
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:18px; flex-wrap:wrap;}
+  .panel-head h3{
+    font-family:var(--disp); font-weight:700; font-size:19px; margin:0; letter-spacing:.02em;
+    display:flex; align-items:center; gap:10px;
+  }
+  .step-no{
+    font-family:var(--mono); font-size:11px; color:var(--bg-0); background:var(--cyan);
+    width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+    font-weight:700;
+  }
+  .panel-head .note{font-family:var(--mono); font-size:11px; color:var(--ink-faint);}
+
+  .caption{
+    font-size:12.5px; color:var(--ink-faint); line-height:1.6; margin-top:12px;
+    padding:10px 12px; border-left:2px dashed var(--border-strong); background:rgba(255,255,255,.015);
+  }
+  .caption.warn{border-left-color:var(--amber); color:#d8b789;}
+
+  /* ---------- data input ---------- */
+  .dropzone{
+    border:1.5px dashed var(--border-strong); border-radius:6px; padding:32px 20px;
+    text-align:center; color:var(--ink-faint); font-size:13px; cursor:pointer;
+    transition:.25s; position:relative;
+  }
+  .dropzone:hover{border-color:var(--cyan); color:var(--ink); background:rgba(72,216,240,.04);}
+  .dropzone svg{margin-bottom:10px; opacity:.7;}
+  .dropzone .file-types{font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; margin-top:6px; color:var(--ink-faint);}
+
+  .row{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;}
+  .row > *{flex:1; min-width:220px;}
+
+  .seg{display:inline-flex; border:1px solid var(--border-strong); border-radius:5px; overflow:hidden;}
+  .seg button{
+    font-family:var(--mono); font-size:12.5px; padding:9px 18px; background:transparent; color:var(--ink-dim);
+    border:none; cursor:pointer; letter-spacing:.03em;
+  }
+  .seg button.active{background:var(--cyan); color:var(--bg-0); font-weight:700;}
+  .seg button + button{border-left:1px solid var(--border-strong);}
+
+  .btn{
+    font-family:var(--mono); font-size:12.5px; letter-spacing:.03em; padding:11px 20px;
+    border:1px solid var(--border-strong); background:rgba(255,255,255,.03); color:var(--ink);
+    border-radius:5px; cursor:pointer; transition:.2s; display:inline-flex; align-items:center; gap:8px;
+  }
+  .btn:hover{border-color:var(--cyan); color:var(--cyan); background:rgba(72,216,240,.06);}
+  .btn.primary{
+    background:linear-gradient(180deg, #57e3f7, #2fb8d4); color:#052430; font-weight:700; border:none;
+    box-shadow:0 6px 22px -6px rgba(72,216,240,.55);
+  }
+  .btn.primary:hover{filter:brightness(1.08); color:#052430;}
+  .btn.block{width:100%; justify-content:center; padding:15px;}
+
+  /* ---------- field ---------- */
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:12.5px; color:var(--ink-dim); margin-bottom:7px;}
+  .field .hint{font-size:11px; color:var(--ink-faint); margin-top:5px; line-height:1.5;}
+  .num{
+    width:100%; font-family:var(--mono); font-size:14px; color:var(--ink);
+    background:rgba(0,0,0,.25); border:1px solid var(--border-strong); border-radius:5px; padding:10px 12px;
+  }
+  .num:focus{outline:none; border-color:var(--cyan);}
+
+  .expander{border:1px solid var(--border-strong); border-radius:6px; margin-top:8px; overflow:hidden;}
+  .expander summary{
+    list-style:none; cursor:pointer; padding:13px 16px; display:flex; align-items:center; gap:10px;
+    font-family:var(--mono); font-size:12.5px; color:var(--ink); background:rgba(255,255,255,.02);
+  }
+  .expander summary::-webkit-details-marker{display:none;}
+  .expander summary .chev{margin-left:auto; transition:.2s; color:var(--ink-faint);}
+  .expander[open] summary .chev{transform:rotate(90deg); color:var(--cyan);}
+  .expander .body{padding:18px 18px 6px; display:grid; grid-template-columns:1fr 1fr; gap:0 20px;}
+
+  /* ---------- metrics ---------- */
+  .metrics{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px;}
+  .metric{
+    border:1px solid var(--border); border-radius:6px; padding:16px 18px; background:rgba(255,255,255,.015);
+  }
+  .metric .k{font-size:11.5px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em;}
+  .metric .v{font-family:var(--mono); font-size:24px; font-weight:600; margin-top:6px; color:var(--ink);}
+  .metric .d{font-family:var(--mono); font-size:11.5px; color:var(--cyan); margin-top:2px;}
+
+  .grades{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:22px;}
+  .grade-tile{border-radius:6px; padding:16px; position:relative; overflow:hidden; border:1px solid var(--border);}
+  .grade-tile .bar{position:absolute; left:0; top:0; bottom:0; width:4px;}
+  .grade-tile .label{font-size:12px; color:var(--ink-dim); display:flex; align-items:center; gap:6px;}
+  .grade-tile .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .grade-tile .pct{font-family:var(--mono); font-size:26px; font-weight:700; margin-top:8px;}
+  .grade-tile .cnt{font-family:var(--mono); font-size:11px; color:var(--ink-faint); margin-top:2px;}
+
+  .grade-a-c .bar,.grade-a-c .dot{background:var(--grade-a);} .grade-a-c .pct{color:var(--grade-a);}
+  .grade-b1-c .bar,.grade-b1-c .dot{background:var(--grade-b1);} .grade-b1-c .pct{color:var(--grade-b1);}
+  .grade-b2-c .bar,.grade-b2-c .dot{background:var(--grade-b2);} .grade-b2-c .pct{color:var(--grade-b2);}
+  .grade-c-c .bar,.grade-c-c .dot{background:var(--grade-c);} .grade-c-c .pct{color:var(--grade-c);}
+
+  .verdict{
+    display:flex; align-items:center; gap:18px; padding:20px 24px; border-radius:6px;
+    background:linear-gradient(90deg, rgba(62,224,138,.12), transparent);
+    border:1px solid rgba(62,224,138,.4);
+  }
+  .verdict .badge{
+    font-family:var(--disp); font-weight:900; font-size:15px; letter-spacing:.04em;
+    padding:8px 16px; border-radius:4px; background:var(--grade-a); color:#052b18; text-transform:uppercase;
+  }
+  .verdict .txt{font-size:13.5px; color:var(--ink-dim);}
+  .verdict .txt b{color:var(--ink); font-family:var(--mono); font-size:15px;}
+
+  /* ---------- heatmap mockup ---------- */
+  .viz-frame{border:1px solid var(--border); border-radius:6px; padding:18px; background:rgba(0,0,0,.2);}
+  .heatmap-wrap{display:flex; gap:16px; align-items:stretch;}
+  .heatmap{
+    flex:1; aspect-ratio:4/3; border:1px solid var(--border-strong); border-radius:4px; position:relative; overflow:hidden;
+    display:grid; grid-template-columns:repeat(24,1fr); grid-template-rows:repeat(18,1fr);
+  }
+  .heatmap i{display:block;}
+  .legend{width:42px; display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .legend .bar{width:14px; flex:1; border-radius:3px;
+    background:linear-gradient(180deg,#ff5577,#ffa53d,#ffe97a,#3ee08a);
+    border:1px solid var(--border-strong);}
+  .legend .lab{font-family:var(--mono); font-size:9.5px; color:var(--ink-faint);}
+  .axis-lab{font-family:var(--mono); font-size:10px; color:var(--ink-faint); text-align:center; margin-top:8px;}
+
+  /* ---------- histogram ---------- */
+  .hist{display:flex; align-items:flex-end; gap:3px; height:150px; padding:0 4px; position:relative;}
+  .hist .refline{position:absolute; top:0; bottom:18px; width:0; border-left:1px dashed var(--ink-faint);}
+  .hist b{flex:1; border-radius:2px 2px 0 0; min-width:2px;}
+  .hist-axis{display:flex; justify-content:space-between; font-family:var(--mono); font-size:10px; color:var(--ink-faint); margin-top:6px;}
+
+  /* ---------- 3D mockup ---------- */
+  .tabs{display:flex; gap:4px; margin-bottom:14px; border-bottom:1px solid var(--border);}
+  .tabs button{
+    font-family:var(--mono); font-size:12px; padding:10px 16px; background:none; border:none; color:var(--ink-faint);
+    cursor:pointer; border-bottom:2px solid transparent; letter-spacing:.02em;
+  }
+  .tabs button.active{color:var(--cyan); border-bottom-color:var(--cyan);}
+  .scene{
+    aspect-ratio:16/8; border:1px solid var(--border-strong); border-radius:6px; background:radial-gradient(600px 300px at 50% 20%, rgba(72,216,240,.08), transparent), #081119;
+    display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+  }
+  .grid3d{
+    width:78%; height:64%; position:relative; transform:rotateX(52deg) rotateZ(-32deg); transform-style:preserve-3d;
+    background-image:linear-gradient(var(--grid-line-strong) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line-strong) 1px, transparent 1px);
+    background-size:28px 28px; border:1px solid var(--border-strong);
+  }
+  .grid3d .pt{position:absolute; width:7px; height:7px; border-radius:50%; box-shadow:0 0 8px currentColor;}
+  .scene .tag-float{position:absolute; top:14px; left:16px; font-family:var(--mono); font-size:10px; color:var(--ink-faint); letter-spacing:.08em;}
+  .scene .zaxis{position:absolute; bottom:14px; right:16px; font-family:var(--mono); font-size:10px; color:var(--ink-faint);}
+
+  /* ---------- table ---------- */
+  table{width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px;}
+  thead th{
+    text-align:left; padding:9px 12px; color:var(--ink-faint); font-weight:500; border-bottom:1px solid var(--border-strong);
+    text-transform:uppercase; letter-spacing:.05em; font-size:10.5px;
+  }
+  tbody td{padding:9px 12px; border-bottom:1px solid var(--border); color:var(--ink-dim);}
+  tbody tr:hover td{background:rgba(72,216,240,.04); color:var(--ink);}
+  .pill{padding:2px 8px; border-radius:10px; font-size:10.5px; display:inline-block;}
+
+  /* ---------- report ---------- */
+  .report{
+    font-family:var(--mono); font-size:11.5px; line-height:1.85; white-space:pre-wrap;
+    background:#050d16; border:1px solid var(--border); border-radius:6px; padding:20px 22px; color:#9fd4de;
+    max-height:340px; overflow:auto;
+  }
+  .report .hl{color:var(--cyan);}
+  .report .dim{color:var(--ink-faint);}
+  .dl-row{display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;}
+
+  footer{
+    text-align:center; padding:36px 20px 60px; color:var(--ink-faint); font-family:var(--mono); font-size:11px;
+    letter-spacing:.04em; line-height:1.9;
+  }
+  footer a{color:var(--cyan-dim);}
+
+  @media (max-width:760px){
+    .metrics{grid-template-columns:1fr 1fr;}
+    .grades{grid-template-columns:1fr 1fr;}
+    .expander .body{grid-template-columns:1fr;}
+    .heatmap-wrap{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+
+<div class="ruler-v"></div>
+<div class="ruler-h"></div>
+
+<div class="topbar">
+  <div class="mark"></div>
+  <div>
+    <h1>바닥면 평탄성 분석</h1>
+    <div class="sub">Floor Flatness Analysis · Point Cloud QC Tool</div>
+  </div>
+  <div class="topbar-right">
+    <span class="tag status">● LOCAL · STREAMLIT</span>
+    <span class="tag">MOCKUP v0.1</span>
+  </div>
+</div>
+<div class="scanbar"></div>
+
+<main>
+
+  <section class="hero">
+    <div class="eyebrow">RISE 학문후속세대 연구 &nbsp;/&nbsp; UI Mockup</div>
+    <h2>점군 데이터로 바닥 품질을<br><span>몇 초 만에</span> 정량화합니다</h2>
+    <p>업로드 → 이상치 제거 → 바닥 분리 → RANSAC 기준평면 추정 → 균열 탐지 → KCS 41 46 01 기준 4등급 자동 분류.
+       전문 장비 없이 오픈소스 스택만으로 즉시 시각화와 보고서를 생성하는 현장 품질관리 도구입니다.</p>
+    <div class="specs">
+      <div><b>±3mm</b> KCS 41 46 01 기준</div>
+      <div><b>A / B1 / B2 / C</b> 4등급 자동 분류</div>
+      <div><b>CSV · TXT · PDF</b> 보고서 자동 출력</div>
+    </div>
+  </section>
+
+  <!-- 1. 데이터 입력 -->
+  <section class="panel" style="animation-delay:.05s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">1</span> 데이터 입력</h3>
+      <span class="note">STEP 01 / INPUT</span>
+    </div>
+
+    <div class="dropzone">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#48d8f0" stroke-width="1.4"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      <div>점군 파일을 이 영역에 끌어놓거나 클릭하여 업로드</div>
+      <div class="file-types">.CSV · .TXT · .XYZ — X, Y, Z 컬럼(헤더 유무 자동 감지)</div>
+    </div>
+
+    <div class="row" style="margin-top:18px;">
+      <div>
+        <label style="font-size:12.5px;color:var(--ink-dim);display:block;margin-bottom:7px;">좌표 단위</label>
+        <div class="seg">
+          <button class="active">m (미터)</button>
+          <button>mm (밀리미터)</button>
+        </div>
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button class="btn">⟳ 샘플 데이터 사용 (바닥+벽체 포함)</button>
+      </div>
+    </div>
+    <div class="caption">✅ 로드됨: <span style="color:var(--ink)">45,231개 포인트</span> (3개 컬럼, 단위: m (미터) → m로 처리됨)</div>
+  </section>
+
+  <!-- 2. 설정 -->
+  <section class="panel" style="animation-delay:.1s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">2</span> 판정 기준 &amp; 바닥 분리 설정</h3>
+      <span class="note">STEP 02 / PARAMETERS</span>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>평탄도 허용 편차 (mm)</label>
+        <input class="num" value="3.00">
+        <div class="hint">KCS 41 46 01 기준: 3m 자 기준 ±3mm</div>
+      </div>
+      <div class="field">
+        <label>크랙 민감도 (0~1, 낮을수록 민감)</label>
+        <input class="num" value="0.65">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Z 여유값 — 바닥 두께 (m)</label>
+        <input class="num" value="0.05">
+      </div>
+      <div class="field">
+        <label>법선 각도 임계값 (°)</label>
+        <input class="num" value="35.0">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>바닥 분리 방식</label>
+      <div class="seg">
+        <button class="active">OR — 기본 방식 (논문 기준)</button>
+        <button>AND — 엄격 방식 (비바닥 수평면 제외)</button>
+      </div>
+    </div>
+    <div class="caption warn">⚠ 바닥 외 다른 수평면(테이블 상판, 계단 디딤판 등)이 스캔 범위에 있으면 바닥으로 오인식될 수 있습니다. 단일 바닥면 스캔을 전제로 합니다.</div>
+
+    <details class="expander" style="margin-top:20px;">
+      <summary>🔧 고급 설정 <span class="chev">▸</span></summary>
+      <div class="body">
+        <div class="field"><label>기준 평면 추정 허용오차 (RANSAC 인라이어, mm)</label><input class="num" value="5.0"></div>
+        <div class="field"><label>기준 평면 최소 인라이어 비율 (%)</label><input class="num" value="30"></div>
+        <div class="field"><label>RANSAC 반복 횟수</label><input class="num" value="1000"></div>
+        <div class="field"><label>이상치 제거 민감도 (표준편차 배수)</label><input class="num" value="2.0"></div>
+      </div>
+    </details>
+
+    <div style="margin-top:22px;">
+      <button class="btn primary block">▶ 분석 실행</button>
+    </div>
+  </section>
+
+  <!-- 3. 결과 요약 -->
+  <section class="panel" style="animation-delay:.15s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">3</span> 분석 결과 요약</h3>
+      <span class="note">STEP 03 / SUMMARY</span>
+    </div>
+
+    <div class="metrics">
+      <div class="metric"><div class="k">총 입력점</div><div class="v">45,231개</div></div>
+      <div class="metric"><div class="k">벽체 제거됨</div><div class="v">12,847개</div><div class="d">28.4%</div></div>
+      <div class="metric"><div class="k">바닥 분석점</div><div class="v">32,384개</div></div>
+    </div>
+
+    <div class="grades">
+      <div class="grade-tile grade-a-c"><i class="bar"></i>
+        <div class="label"><i class="dot"></i>A · 정상</div>
+        <div class="pct">87.1%</div><div class="cnt">28,207개</div>
+      </div>
+      <div class="grade-tile grade-b1-c"><i class="bar"></i>
+        <div class="label"><i class="dot"></i>B1 · 돌출</div>
+        <div class="pct">4.2%</div><div class="cnt">1,360개</div>
+      </div>
+      <div class="grade-tile grade-b2-c"><i class="bar"></i>
+        <div class="label"><i class="dot"></i>B2 · 함몰</div>
+        <div class="pct">6.9%</div><div class="cnt">2,234개</div>
+      </div>
+      <div class="grade-tile grade-c-c"><i class="bar"></i>
+        <div class="label"><i class="dot"></i>C · 크랙</div>
+        <div class="pct">1.8%</div><div class="cnt">583개</div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <div class="badge">✅ 양호 GOOD</div>
+      <div class="txt">종합 등급 판정 결과 — 불량 비율 <b>12.9%</b> · 평균 편차 <b>1.54mm</b> · 표준편차 <b>1.73mm</b></div>
+    </div>
+    <div class="caption" style="margin-top:14px;">🧹 이상치 제거: 전체의 3.2%를 노이즈로 제거했습니다. &nbsp;|&nbsp; 최대 돌출 +9.84mm · 최대 함몰 −8.21mm</div>
+  </section>
+
+  <!-- 4. 2D 히트맵 -->
+  <section class="panel" style="animation-delay:.2s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">4</span> 2D 평탄성 히트맵</h3>
+      <span class="note">RdYlGn_r · griddata(linear)</span>
+    </div>
+    <div class="viz-frame">
+      <div class="heatmap-wrap">
+        <div>
+          <div class="heatmap" id="heatmap"></div>
+          <div class="axis-lab">X (m) — 0 → 3.0</div>
+        </div>
+        <div class="legend">
+          <div class="lab">20</div>
+          <div class="bar"></div>
+          <div class="lab">0 mm</div>
+        </div>
+      </div>
+    </div>
+    <div class="caption">결함 분포가 대각선 방향의 특정 구역(균열 영역)에 집중되는 경향이 관찰되었습니다.</div>
+  </section>
+
+  <!-- 5. 히스토그램 -->
+  <section class="panel" style="animation-delay:.25s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">5</span> 편차 분포 (기준 대비)</h3>
+      <span class="note">± 3mm reference</span>
+    </div>
+    <div class="viz-frame">
+      <div class="hist" id="hist"></div>
+      <div class="hist-axis"><span>−12mm</span><span>−3mm</span><span>0</span><span>+3mm</span><span>+12mm</span></div>
+    </div>
+  </section>
+
+  <!-- 6. 3D 시각화 -->
+  <section class="panel" style="animation-delay:.3s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">6</span> 3D 평탄성 시각화</h3>
+      <span class="note">Z 과장 ×100</span>
+    </div>
+    <div class="tabs">
+      <button class="active" onclick="swapTab(this,0)">🏔️ 3D 표면 (높낮이)</button>
+      <button onclick="swapTab(this,1)">분류별 3D 시각화</button>
+      <button onclick="swapTab(this,2)">전체 포인트 클라우드</button>
+    </div>
+    <div class="scene">
+      <div class="tag-float">X · Y · Z (m)</div>
+      <div class="zaxis">편차 (×100 과장)</div>
+      <div class="grid3d" id="grid3d"></div>
+    </div>
+  </section>
+
+  <!-- 7. 데이터 테이블 -->
+  <section class="panel" style="animation-delay:.35s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">7</span> 데이터 테이블</h3>
+      <span class="note">32,384 rows</span>
+    </div>
+    <table>
+      <thead><tr><th>X (m)</th><th>Y (m)</th><th>Z (m)</th><th>편차_절대(mm)</th><th>편차_부호(mm)</th><th>크랙점수_상대(0-1)</th><th>분류</th></tr></thead>
+      <tbody>
+        <tr><td>1.203</td><td>0.842</td><td>0.0021</td><td>2.10</td><td>+2.10</td><td>0.12</td><td><span class="pill" style="background:rgba(62,224,138,.15);color:var(--grade-a)">A_정상</span></td></tr>
+        <tr><td>1.487</td><td>1.005</td><td>0.0064</td><td>6.40</td><td>+6.40</td><td>0.31</td><td><span class="pill" style="background:rgba(255,165,61,.15);color:var(--grade-b1)">B1_돌출</span></td></tr>
+        <tr><td>1.502</td><td>2.011</td><td>-0.0055</td><td>5.50</td><td>−5.50</td><td>0.28</td><td><span class="pill" style="background:rgba(79,163,255,.15);color:var(--grade-b2)">B2_함몰</span></td></tr>
+        <tr><td>1.520</td><td>2.240</td><td>-0.0031</td><td>3.10</td><td>−3.10</td><td>0.79</td><td><span class="pill" style="background:rgba(255,85,119,.15);color:var(--grade-c)">C_크랙</span></td></tr>
+        <tr><td>0.334</td><td>3.102</td><td>0.0006</td><td>0.60</td><td>+0.60</td><td>0.09</td><td><span class="pill" style="background:rgba(62,224,138,.15);color:var(--grade-a)">A_정상</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 8. 보고서 -->
+  <section class="panel" style="animation-delay:.4s">
+    <i class="cbl"></i><i class="cbr"></i>
+    <div class="panel-head">
+      <h3><span class="step-no">8</span> 종합 결과 보고서</h3>
+      <span class="note">STEP 04 / EXPORT</span>
+    </div>
+    <div class="report">================================================================
+<span class="hl">            바닥면 평탄성 분석 결과 보고서</span>
+            (Floor Flatness Analysis Report)
+================================================================
+<span class="dim">분석 일시  : 2026-07-06 15:42:07
+입력 좌표 단위 : m (미터)
+처리 좌표 단위 : m (모든 기준값은 m 기준)</span>
+적용 기준  : KCS 41 46 01 (허용 편차 ±3.0mm)
+기준 평면 추정 허용오차 (RANSAC 인라이어) : ±5.0mm (최소 인라이어 비율 30%, 반복 1000회)
+이상치 제거 민감도 (표준편차 배수) : 2.0
+바닥 분리 방식 : OR (기본, 논문 기준)
+이상치 제거 : 3.2% 제거
+<span class="dim">※ 크랙점수는 해당 스캔 내부의 상대 지표이며, 서로 다른 파일 간 절대 비교에는 주의가 필요합니다.</span>
+
+────────────────────────────────────────────────────────────────
+<span class="hl">[ 종합 판정 ]</span>
+────────────────────────────────────────────────────────────────
+  불량 비율         : 12.9%
+  종합 등급         : ✅ 양호 (Good)
+================================================================</div>
+    <div class="dl-row">
+      <button class="btn">📥 결과 CSV 저장</button>
+      <button class="btn">📄 TXT 저장</button>
+      <button class="btn primary">📑 PDF 보고서 저장</button>
+    </div>
+  </section>
+
+  <footer>
+    UI MOCKUP — floor_flatness_app.py (Streamlit) 재현 · 실제 분석과 연결되지 않은 정적 목업입니다<br>
+    기준 문서: <a href="../평활도PRD.md">평활도PRD.md</a> · <a href="../평활도측정.md">평활도측정.md</a>
+  </footer>
+
+</main>
+
+<script>
+  // ---- fake heatmap grid: green base + diagonal amber/red "crack" streak ----
+  (function(){
+    const hm = document.getElementById('heatmap');
+    const cols = 24, rows = 18;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const cell = document.createElement('i');
+        // diagonal crack line proximity
+        const diagPos = Math.abs((c/cols) - (r/rows));
+        let val = Math.random()*3; // baseline mm noise
+        if(diagPos < 0.05) val = 14 + Math.random()*9;
+        else if(diagPos < 0.09) val = 6 + Math.random()*6;
+        else if(Math.random() < 0.03) val = 4 + Math.random()*4;
+        const hue = Math.max(0, 140 - val*9); // 140 green -> 0 red
+        const light = 42 + Math.random()*6;
+        cell.style.background = `hsl(${hue}, 72%, ${light}%)`;
+        cell.style.opacity = 0.88;
+        hm.appendChild(cell);
+      }
+    }
+  })();
+
+  // ---- fake histogram bars ----
+  (function(){
+    const hist = document.getElementById('hist');
+    const n = 46;
+    for(let i=0;i<n;i++){
+      const t = i/(n-1);
+      const x = (t-0.5)*24; // -12..12 mm range
+      const gaussian = Math.exp(-Math.pow(x/3.2,2));
+      const h = Math.max(4, gaussian*140 + Math.random()*6);
+      const bar = document.createElement('b');
+      bar.style.height = h+'px';
+      let color = '#3ee08a';
+      if(x > 3) color = '#ffa53d';
+      if(x < -3) color = '#4fa3ff';
+      if(Math.abs(x) > 8 && Math.random()<0.4) color = '#ff5577';
+      bar.style.background = color;
+      bar.style.opacity = .85;
+      hist.appendChild(bar);
+    }
+    ['33.3%','62.5%'].forEach(pos=>{
+      const l = document.createElement('div'); l.className='refline'; l.style.left=pos; hist.appendChild(l);
+      const l2 = document.createElement('div'); l2.className='refline'; l2.style.left=(100-parseFloat(pos))+'%'; hist.appendChild(l2);
+    });
+  })();
+
+  // ---- fake 3D scattered points ----
+  (function(){
+    const g = document.getElementById('grid3d');
+    const colors = {a:'#3ee08a', b1:'#ffa53d', b2:'#4fa3ff', c:'#ff5577'};
+    const weighted = ['a','a','a','a','a','a','a','b1','b2','b2','c'];
+    for(let i=0;i<70;i++){
+      const p = document.createElement('div');
+      p.className='pt';
+      const key = weighted[Math.floor(Math.random()*weighted.length)];
+      p.style.color = colors[key];
+      p.style.background = colors[key];
+      p.style.left = (Math.random()*96)+'%';
+      p.style.top = (Math.random()*96)+'%';
+      p.style.transform = `translateZ(${Math.random()*30}px)`;
+      g.appendChild(p);
+    }
+  })();
+
+  function swapTab(btn, idx){
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
