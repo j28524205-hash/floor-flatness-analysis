@@ -2,16 +2,118 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.io as pio
 from sklearn.neighbors import NearestNeighbors
 from scipy.interpolate import griddata
 import io
 import os
 from fpdf import FPDF
 
-st.set_page_config(page_title="바닥면 평탄성 분석", layout="centered")
+st.set_page_config(page_title="바닥면 평탄성 분석", layout="wide", page_icon="📐")
 
 if "xyz" not in st.session_state:
     st.session_state.xyz = None
+
+# ── 블루프린트 테마: Plotly 차트 기본 스타일 ──────────────────
+_blueprint = go.layout.Template()
+_blueprint.layout.paper_bgcolor = "#0b1e30"
+_blueprint.layout.plot_bgcolor = "#0b1e30"
+_blueprint.layout.font = dict(family="IBM Plex Mono, monospace", color="#c9dced", size=12)
+_axis = dict(gridcolor="rgba(110,190,255,.15)", zerolinecolor="rgba(110,190,255,.3)",
+             linecolor="rgba(143,168,196,.4)", color="#8fa9c7")
+_blueprint.layout.xaxis = _axis
+_blueprint.layout.yaxis = _axis
+_blueprint.layout.scene = dict(
+    xaxis=dict(backgroundcolor="#0b1e30", gridcolor="rgba(110,190,255,.15)", color="#8fa9c7"),
+    yaxis=dict(backgroundcolor="#0b1e30", gridcolor="rgba(110,190,255,.15)", color="#8fa9c7"),
+    zaxis=dict(backgroundcolor="#0b1e30", gridcolor="rgba(110,190,255,.15)", color="#8fa9c7"),
+)
+_blueprint.layout.legend = dict(font=dict(color="#c9dced"))
+_blueprint.layout.colorway = ["#48d8f0", "#ffa53d", "#4fa3ff", "#ff5577", "#3ee08a"]
+pio.templates["blueprint"] = _blueprint
+pio.templates.default = "blueprint"
+
+# ── 블루프린트 테마: 전역 CSS ──────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap');
+
+:root{
+  --bp-bg:#081420; --bp-bg2:#0b1e30; --bp-ink:#e7f1fb; --bp-dim:#8fa9c7;
+  --bp-border:rgba(143,168,196,.25); --bp-cyan:#48d8f0; --bp-amber:#ffb648;
+}
+
+html, body, [class*="css"]{ font-family:'IBM Plex Sans KR','IBM Plex Sans',sans-serif; }
+
+[data-testid="stAppViewContainer"]{
+  background:
+    linear-gradient(rgba(110,190,255,.06) 1px, transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg, rgba(110,190,255,.06) 1px, transparent 1px) 0 0/40px 40px,
+    radial-gradient(1000px 600px at 10% -10%, #123456 0%, transparent 60%),
+    var(--bp-bg);
+  color: var(--bp-ink);
+}
+[data-testid="stHeader"]{ background:rgba(8,20,32,.7); }
+.block-container{ padding-top:2rem; max-width:1180px; }
+
+h1, h2, h3{
+  font-family:'Big Shoulders','IBM Plex Sans KR',sans-serif !important;
+  font-weight:800 !important; letter-spacing:.02em; text-transform:uppercase;
+  color: var(--bp-ink) !important;
+}
+h1{ border-bottom:1px solid var(--bp-border); padding-bottom:.5rem; }
+
+p, label, span, div{ color: var(--bp-ink); }
+
+[data-testid="stMetric"]{
+  background:rgba(255,255,255,.02); border:1px solid var(--bp-border); border-radius:6px;
+  padding:12px 16px;
+}
+[data-testid="stMetricValue"]{ font-family:'IBM Plex Mono',monospace !important; color:var(--bp-cyan); }
+[data-testid="stMetricLabel"]{ color:var(--bp-dim) !important; text-transform:uppercase; font-size:11px !important; letter-spacing:.05em; }
+
+.stButton > button, .stDownloadButton > button{
+  font-family:'IBM Plex Mono',monospace; letter-spacing:.03em;
+  background:rgba(255,255,255,.03); color:var(--bp-ink);
+  border:1px solid var(--bp-border); border-radius:5px;
+}
+.stButton > button:hover, .stDownloadButton > button:hover{
+  border-color:var(--bp-cyan); color:var(--bp-cyan); background:rgba(72,216,240,.08);
+}
+.stButton > button[kind="primary"]{
+  background:linear-gradient(180deg,#57e3f7,#2fb8d4); color:#052430; font-weight:700; border:none;
+}
+.stButton > button[kind="primary"]:hover{ color:#052430; filter:brightness(1.08); }
+
+[data-testid="stExpander"]{ border:1px solid var(--bp-border) !important; border-radius:6px !important; background:rgba(255,255,255,.015); }
+
+input, textarea, [data-baseweb="input"] > div{
+  font-family:'IBM Plex Mono',monospace !important;
+  background:rgba(0,0,0,.25) !important; color:var(--bp-ink) !important;
+  border-color: var(--bp-border) !important;
+}
+
+[data-testid="stDataFrame"]{ border:1px solid var(--bp-border); border-radius:6px; }
+
+[data-testid="stTabs"] button{ font-family:'IBM Plex Mono',monospace; color:var(--bp-dim); }
+[data-testid="stTabs"] button[aria-selected="true"]{ color:var(--bp-cyan) !important; border-bottom-color:var(--bp-cyan) !important; }
+
+[data-testid="stFileUploaderDropzone"]{
+  background:rgba(255,255,255,.02) !important; border:1.5px dashed var(--bp-border) !important;
+}
+
+[data-testid="stAlert"]{ border-radius:6px; font-size:13.5px; }
+
+[data-testid="stCaptionContainer"], .stCaption{ color:var(--bp-dim) !important; }
+
+code, pre, [data-testid="stCodeBlock"]{
+  font-family:'IBM Plex Mono',monospace !important;
+  background:#050d16 !important; color:#9fd4de !important; border:1px solid var(--bp-border) !important;
+}
+
+hr{ border-color: var(--bp-border); }
+</style>
+""", unsafe_allow_html=True)
 
 
 # ── 분석 함수 ──────────────────────────────────────────────
