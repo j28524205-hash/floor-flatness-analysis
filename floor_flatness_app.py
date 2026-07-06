@@ -13,6 +13,8 @@ st.set_page_config(page_title="바닥면 평탄성 분석", layout="wide", page_
 
 if "xyz" not in st.session_state:
     st.session_state.xyz = None
+if "analysis_result" not in st.session_state:
+    st.session_state.analysis_result = None
 
 # ── 블루프린트 테마: Plotly 차트 기본 스타일 ──────────────────
 _blueprint = go.layout.Template()
@@ -522,6 +524,7 @@ if uploaded:
 
         st.session_state.xyz = xyz_candidate
         st.session_state.xyz_unit_note = unit_choice
+        st.session_state.analysis_result = None  # 새 데이터 로드 시 이전 분석 결과는 무효화
         st.success(f"✅ 로드됨: {len(st.session_state.xyz):,}개 포인트 ({data.shape[1]}개 컬럼, "
                    f"단위: {unit_choice} → m로 처리됨)")
     except Exception as e:
@@ -541,6 +544,7 @@ if use_sample:
     wall = np.column_stack([wx, wy, wz])
     st.session_state.xyz = np.vstack([floor, wall])
     st.session_state.xyz_unit_note = "m (샘플 데이터)"
+    st.session_state.analysis_result = None  # 새 데이터 로드 시 이전 분석 결과는 무효화
 
 xyz = st.session_state.xyz
 if xyz is not None:
@@ -596,21 +600,29 @@ if xyz is not None:
                  "이상치 비율이 높으면 늘려보세요.")
 
     # ── 분석 실행 ──
+    # 분석 결과를 session_state에 저장해서, 이후 슬라이더(Z 과장 배율 등) 조작으로
+    # 스크립트가 재실행돼도 결과가 사라지지 않도록 한다. st.button()은 클릭된 그 순간의
+    # 재실행에서만 True이므로, 결과 표시를 버튼 블록 안에 두면 다른 위젯 조작 시 결과가
+    # 사라지는 문제가 있었다.
     if len(xyz) < MIN_POINTS:
         st.warning(f"⚠️ 분석에는 최소 {MIN_POINTS}개 이상의 포인트가 필요합니다. "
                    f"현재 입력된 포인트: {len(xyz):,}개")
-    elif st.button("▶ 분석 실행", type="primary", use_container_width=True):
-        try:
-            with st.spinner("분석 중..."):
-                result = run_analysis(xyz, z_margin, normal_angle, threshold_mm, curv_thresh,
-                                       ransac_inlier_mm=ransac_inlier_mm, floor_mode=floor_mode,
-                                       min_inlier_ratio=min_inlier_ratio,
-                                       sor_std_ratio=sor_std_ratio, ransac_n_iter=ransac_n_iter)
-        except Exception as e:
-            st.error(f"⚠️ 분석 중 오류가 발생했습니다: {e}\n\n"
-                     "포인트 배치가 지나치게 단순(일직선 등)하거나 파라미터가 데이터와 맞지 않을 수 있습니다.")
-            st.stop()
+    else:
+        if st.button("▶ 분석 실행", type="primary", use_container_width=True):
+            try:
+                with st.spinner("분석 중..."):
+                    st.session_state.analysis_result = run_analysis(
+                        xyz, z_margin, normal_angle, threshold_mm, curv_thresh,
+                        ransac_inlier_mm=ransac_inlier_mm, floor_mode=floor_mode,
+                        min_inlier_ratio=min_inlier_ratio,
+                        sor_std_ratio=sor_std_ratio, ransac_n_iter=ransac_n_iter)
+            except Exception as e:
+                st.session_state.analysis_result = None
+                st.error(f"⚠️ 분석 중 오류가 발생했습니다: {e}\n\n"
+                         "포인트 배치가 지나치게 단순(일직선 등)하거나 파라미터가 데이터와 맞지 않을 수 있습니다.")
 
+    if st.session_state.get("analysis_result") is not None:
+        result = st.session_state.analysis_result
         floor_pts = result["floor_pts"]
         wall_pts = result["wall_pts"]
         signed_mm = result["signed_mm"]
