@@ -157,18 +157,22 @@ def separate_floor(points, z_margin, normal_angle_thresh, mode="OR"):
     z_min = points[:, 2].min()
     z_mask = points[:, 2] <= z_min + z_margin
 
-    # 법선 추정 (k=10 이웃)
-    k = min(10, len(points) - 1)
+    # 법선 추정 (k=10 이웃, 전체 포인트에 대해 벡터화 — 대규모 점군에서 Python
+    # 반복문 방식은 수십만~수백만 점에서 매우 느려 배포 서버가 응답 없음으로
+    # 재시작되는 원인이 되었음. NearestNeighbors 조회 자체는 그대로 두고,
+    # 이후 이웃별 공분산행렬 계산과 고유값분해만 전부 배치로 처리한다.
+    n = len(points)
+    k = min(10, n - 1)
     nbrs = NearestNeighbors(n_neighbors=k + 1).fit(points)
     _, idx = nbrs.kneighbors(points)
-    angle_mask = np.zeros(len(points), dtype=bool)
-    for i, neighbors in enumerate(idx):
-        nb = points[neighbors[1:]]
-        centered = nb - nb.mean(axis=0)
-        _, _, vh = np.linalg.svd(centered, full_matrices=False)
-        normal = vh[-1]
-        angle = np.degrees(np.arccos(np.clip(abs(normal[2]), 0, 1)))
-        angle_mask[i] = angle < normal_angle_thresh
+    neighbor_idx = idx[:, 1:]                                  # (n, k), 자기 자신 제외
+    nb = points[neighbor_idx]                                  # (n, k, 3)
+    centered = nb - nb.mean(axis=1, keepdims=True)
+    cov = np.einsum('nki,nkj->nij', centered, centered) / k    # (n, 3, 3)
+    _, eigvecs = np.linalg.eigh(cov)                           # 고유값 오름차순
+    normals = eigvecs[:, :, 0]                                  # 최소고유값 방향 = 법선
+    angle = np.degrees(np.arccos(np.clip(np.abs(normals[:, 2]), 0, 1)))
+    angle_mask = angle < normal_angle_thresh
 
     floor_mask = (z_mask & angle_mask) if mode == "AND" else (z_mask | angle_mask)
     return floor_mask
@@ -234,38 +238,31 @@ def detect_cracks(points, k=15):
     달라질 수 있다. 서로 다른 스캔 파일 간 결과를 절대적으로 비교하려면
     이 상대적 정규화 방식을 절대/분위수 기준으로 바꿔야 한다.
     """
-    k = min(k, len(points) - 1)
+    # 이웃 조회를 제외한 전 과정을 벡터화한다(사유는 separate_floor 주석 참고).
+    n = len(points)
+    k = min(k, n - 1)
     nbrs = NearestNeighbors(n_neighbors=k + 1).fit(points)
     _, idx = nbrs.kneighbors(points)
+    neighbor_idx = idx[:, 1:]                                   # (n, k)
 
-    normals = np.zeros((len(points), 3))
-    curvatures = np.zeros(len(points))
-    anisotropy = np.zeros(len(points))
+    nb = points[neighbor_idx]                                   # (n, k, 3)
+    centered = nb - nb.mean(axis=1, keepdims=True)
+    cov = np.einsum('nki,nkj->nij', centered, centered) / k     # (n, 3, 3)
+    eigvals, eigvecs = np.linalg.eigh(cov)                       # 오름차순
+    eigvals = np.abs(eigvals)
 
-    for i, neighbors in enumerate(idx):
-        nb = points[neighbors[1:]]
-        centered = nb - nb.mean(axis=0)
-        cov = centered.T @ centered / k
-        eigvals, eigvecs = np.linalg.eigh(cov)
-        eigvals = np.abs(eigvals)
-        order = np.argsort(eigvals)
-        eigvals = eigvals[order]
-        eigvecs = eigvecs[:, order]
+    normals = eigvecs[:, :, 0].copy()                            # 최소고유값 방향
+    flip = normals[:, 2] < 0
+    normals[flip] = -normals[flip]
 
-        normal = eigvecs[:, 0]
-        if normal[2] < 0:
-            normal = -normal
-        normals[i] = normal
-        curvatures[i] = eigvals[0] / (eigvals.sum() + 1e-10)
-        # 비등방성: 크랙은 한 방향으로만 곡률이 높음
-        anisotropy[i] = (eigvals[2] - eigvals[1]) / (eigvals[2] + 1e-10)
+    curvatures = eigvals[:, 0] / (eigvals.sum(axis=1) + 1e-10)
+    # 비등방성: 크랙은 한 방향으로만 곡률이 높음
+    anisotropy = (eigvals[:, 2] - eigvals[:, 1]) / (eigvals[:, 2] + 1e-10)
 
     # 법선 불연속성: 이웃 법선과의 평균 각도 차이
-    discontinuity = np.zeros(len(points))
-    for i, neighbors in enumerate(idx):
-        nb_normals = normals[neighbors[1:]]
-        cos_a = np.clip(np.abs(nb_normals @ normals[i]), 0, 1)
-        discontinuity[i] = np.degrees(np.arccos(cos_a)).mean()
+    nb_normals = normals[neighbor_idx]                           # (n, k, 3)
+    cos_a = np.clip(np.abs(np.einsum('nkj,nj->nk', nb_normals, normals)), 0, 1)
+    discontinuity = np.degrees(np.arccos(cos_a)).mean(axis=1)
 
     def norm01(x):
         r = x.max() - x.min()
@@ -418,12 +415,24 @@ def safe_griddata(xy, values, mesh):
 # 판정 기준을 바꿔도 기준 평면 자체는 흔들리지 않도록 하기 위함.
 RANSAC_INLIER_MM = 5.0
 MIN_POINTS = 30
+# Streamlit Community Cloud 무료 티어 메모리 한도(약 1GB) 안에서 안전하게 돌도록
+# 하는 분석용 포인트 수 상한. 실제 스캐너로 취득한 수십만~수백만 점 데이터가
+# 이 한도를 넘기면 메모리 부족으로 앱이 강제 재시작되는 문제가 있었음.
+MAX_ANALYSIS_POINTS = 300_000
 
 
 def run_analysis(xyz, z_margin, normal_angle, threshold_mm, curv_thresh,
                   ransac_inlier_mm=RANSAC_INLIER_MM, floor_mode="OR",
-                  min_inlier_ratio=0.3, sor_std_ratio=2.0, ransac_n_iter=1000):
+                  min_inlier_ratio=0.3, sor_std_ratio=2.0, ransac_n_iter=1000,
+                  max_analysis_points=MAX_ANALYSIS_POINTS):
     """이상치 제거 → 바닥 분리 → 평면 추정 → 균열 탐지 → 포인트 분류까지 전체 파이프라인 실행."""
+    downsampled_from = None
+    if len(xyz) > max_analysis_points:
+        downsampled_from = len(xyz)
+        rng = np.random.default_rng(42)
+        sel = rng.choice(len(xyz), max_analysis_points, replace=False)
+        xyz = xyz[sel]
+
     clean, outlier_removed_ratio, outlier_status = remove_outliers(xyz, std_ratio=sor_std_ratio)
     if len(clean) < MIN_POINTS:
         raise ValueError(
@@ -463,6 +472,7 @@ def run_analysis(xyz, z_margin, normal_angle, threshold_mm, curv_thresh,
         crack_mask=crack_mask, protrude_mask=protrude_mask,
         depress_mask=depress_mask, good_mask=good_mask, labels=labels,
         outlier_removed_ratio=outlier_removed_ratio, outlier_status=outlier_status,
+        downsampled_from=downsampled_from,
     )
 
 
@@ -598,6 +608,11 @@ if xyz is not None:
             value=1000, min_value=100, max_value=10000, step=100,
             help="많을수록 더 안정적인 평면을 찾지만 느려집니다. 포인트 수가 매우 많거나 "
                  "이상치 비율이 높으면 늘려보세요.")
+        max_analysis_points = st.number_input(
+            "분석 최대 포인트 수 (초과 시 무작위 다운샘플링)",
+            value=MAX_ANALYSIS_POINTS, min_value=10_000, max_value=2_000_000, step=50_000,
+            help="실제 스캐너 데이터가 수십만~수백만 점이면 서버 메모리 한도를 넘어 "
+                 "앱이 강제 재시작될 수 있습니다. 이 값을 넘으면 무작위로 샘플링해 분석합니다.")
 
     # ── 분석 실행 ──
     # 분석 결과를 session_state에 저장해서, 이후 슬라이더(Z 과장 배율 등) 조작으로
@@ -615,7 +630,8 @@ if xyz is not None:
                         xyz, z_margin, normal_angle, threshold_mm, curv_thresh,
                         ransac_inlier_mm=ransac_inlier_mm, floor_mode=floor_mode,
                         min_inlier_ratio=min_inlier_ratio,
-                        sor_std_ratio=sor_std_ratio, ransac_n_iter=ransac_n_iter)
+                        sor_std_ratio=sor_std_ratio, ransac_n_iter=ransac_n_iter,
+                        max_analysis_points=max_analysis_points)
             except Exception as e:
                 st.session_state.analysis_result = None
                 st.error(f"⚠️ 분석 중 오류가 발생했습니다: {e}\n\n"
@@ -635,6 +651,11 @@ if xyz is not None:
         labels = result["labels"]
         outlier_removed_ratio = result["outlier_removed_ratio"]
         outlier_status = result["outlier_status"]
+        downsampled_from = result["downsampled_from"]
+        if downsampled_from is not None:
+            st.info(f"ℹ️ 원본 {downsampled_from:,}개 포인트가 분석 상한을 초과해, "
+                     f"무작위로 {max_analysis_points:,}개로 다운샘플링한 뒤 분석했습니다 "
+                     "(고급 설정에서 상한 조정 가능).")
         if outlier_status == "ok" and outlier_removed_ratio > 0:
             st.caption(f"🧹 이상치 제거: 전체의 {outlier_removed_ratio*100:.1f}%를 노이즈로 제거했습니다.")
         elif outlier_status == "skipped_too_many":
@@ -913,6 +934,7 @@ if xyz is not None:
 이상치 제거 민감도 (표준편차 배수) : {sor_std_ratio:.1f}
 바닥 분리 방식 : {floor_mode} ({'테이블 상판 등 비바닥 수평면 제외에 엄격' if floor_mode == 'AND' else '기본(논문 기준)'})
 이상치 제거 : {outlier_removed_ratio*100:.1f}% 제거{'(안전장치로 생략됨)' if outlier_status == 'skipped_too_many' else ''}
+다운샘플링 : {(f'원본 {downsampled_from:,}개 → {max_analysis_points:,}개로 무작위 다운샘플링') if downsampled_from is not None else '적용 안 함'}
 ※ 크랙점수는 해당 스캔 내부의 상대 지표이며, 서로 다른 파일 간 절대 비교에는 주의가 필요합니다.
 
 ────────────────────────────────────────────────────────────────
