@@ -490,6 +490,18 @@ unit_choice = st.radio("좌표 단위", ["m (미터)", "mm (밀리미터)"], hor
 use_sample = st.button("샘플 데이터 사용 (바닥+벽체 포함)")
 
 if uploaded:
+    # st.file_uploader()는 st.button()과 달리 한 번 업로드되면 파일을 계속 들고
+    # 있어서, 이 블록이 슬라이더 조작 등 다른 위젯으로 인한 재실행 때마다 매번
+    # 다시 실행된다. 그때마다 "새 파일이 들어왔다"고 착각해 아래에서
+    # analysis_result를 초기화해버리면, 분석 후 슬라이더만 움직여도 결과가
+    # 사라지는 문제가 생긴다. 파일 서명이 실제로 바뀐 경우에만 재처리한다.
+    file_sig = getattr(uploaded, "file_id", None) or (uploaded.name, uploaded.size)
+    is_new_upload = st.session_state.get("last_uploaded_sig") != file_sig
+else:
+    is_new_upload = False
+
+if uploaded and is_new_upload:
+    st.session_state.last_uploaded_sig = file_sig
     try:
         raw = uploaded.read()
         # 1차: numpy loadtxt (공백/탭 구분, 헤더 없음)
