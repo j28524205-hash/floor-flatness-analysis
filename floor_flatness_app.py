@@ -231,7 +231,7 @@ def fit_plane_ransac(points, threshold_m, n_iter=1000, seed=42, min_inlier_ratio
 
 def detect_cracks(points, k=15):
     """
-    법선 벡터 기반 크랙 탐지 (곡률 + 법선 불연속성 + 비등방성 결합)
+    법선 벡터 기반 크랙 탐지 (곡률 + 법선 불연속성 + 선형성 결합)
 
     한계: norm01()이 해당 데이터셋 내부의 최소/최대값으로 0~1 정규화를 하므로,
     같은 curv_thresh(크랙 민감도) 값이라도 데이터셋마다 실제로 걸러내는 기준이
@@ -256,7 +256,8 @@ def detect_cracks(points, k=15):
     normals[flip] = -normals[flip]
 
     curvatures = eigvals[:, 0] / (eigvals.sum(axis=1) + 1e-10)
-    # 비등방성: 크랙은 한 방향으로만 곡률이 높음
+    # 선형성(linearity): 크랙은 한 방향으로만 곡률이 높음. 변수명은 anisotropy이나
+    # 지역 기하특징 표기 관례상 이 식은 비등방성((λ2-λ0)/λ2)이 아니라 선형성에 해당함
     anisotropy = (eigvals[:, 2] - eigvals[:, 1]) / (eigvals[:, 2] + 1e-10)
 
     # 법선 불연속성: 이웃 법선과의 평균 각도 차이
@@ -268,7 +269,7 @@ def detect_cracks(points, k=15):
         r = x.max() - x.min()
         return (x - x.min()) / (r + 1e-10)
 
-    # 결합 크랙 점수 (0~1): 불연속성 40% + 곡률 40% + 비등방성 20%
+    # 결합 크랙 점수 (0~1): 불연속성 40% + 곡률 40% + 선형성 20%
     score = (norm01(discontinuity) * 0.4 +
              norm01(curvatures) * 0.4 +
              norm01(anisotropy) * 0.2)
@@ -488,6 +489,13 @@ def run_analysis(xyz, z_margin, normal_angle, threshold_mm, curv_thresh,
 # ── UI ────────────────────────────────────────────────────
 
 st.title("🏗️ 바닥면 평탄성 분석")
+st.warning(
+    "⚠️ 연구용 프로토타입입니다. 공식 KCS 적합성 판정이나 "
+    "현장 최종 판정 근거로 사용할 수 없습니다. "
+    "합성 검증(ground truth 대조) 결과, 균열(C) 탐지는 기본 파라미터 기준 "
+    "recall 0%로 사실상 작동하지 않습니다. "
+    "업로드하는 점군 데이터에 민감한 위치·구조 정보가 포함되지 않도록 주의하세요."
+)
 
 # ── 데이터 입력 ──
 st.subheader("📁 데이터 입력")
