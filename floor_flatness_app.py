@@ -589,7 +589,10 @@ if xyz is not None:
     c1, c2 = st.columns(2)
     threshold_mm = c1.number_input("평탄도 허용 편차 (mm)", value=3.00, min_value=0.1, step=0.1, format="%.2f")
     curv_thresh = c2.number_input("크랙 민감도 (0~1, 낮을수록 민감)", value=0.65, min_value=0.1, max_value=0.99, step=0.01, format="%.2f")
-    st.caption("KCS 41 46 01 기준: 3m 자 기준 ±3mm")
+    st.caption("※ KCS 41 46 01(바닥 평탄도 허용오차 ±3mm)에서 채택한 수치 기준이며, "
+               "이 값을 점-기준평면 편차에 적용한 자체 작업 기준입니다. "
+               "KCS 원 규정의 3m 직선자 측정 절차를 그대로 재현한 것이 아니며, "
+               "공식 적합·부적합 판정 근거로 사용할 수 없습니다.")
     st.caption("※ 크랙 민감도는 이번 스캔 데이터 내 상대적 기준이라, 다른 스캔 파일과 "
                "같은 값이어도 실제로 걸러지는 정도가 달라질 수 있습니다.")
 
@@ -952,7 +955,7 @@ if xyz is not None:
 분석 일시  : {now}
 입력 좌표 단위 : {st.session_state.get("xyz_unit_note", "m")}
 처리 좌표 단위 : m (모든 기준값은 m 기준)
-적용 기준  : KCS 41 46 01 (허용 편차 ±{threshold_mm:.1f}mm)
+적용 기준  : 점-기준평면 편차 ±{threshold_mm:.1f}mm (KCS 41 46 01에서 채택한 수치 기준을 적용한 자체 작업 기준이며, KCS 원 규정의 3m 직선자 측정 절차를 재현한 것이 아니고 공식 적합·부적합 판정 근거가 아닙니다)
 기준 평면 추정 허용오차 (RANSAC 인라이어) : ±{ransac_inlier_mm:.1f}mm (최소 인라이어 비율 {min_inlier_ratio*100:.0f}%, 반복 {ransac_n_iter}회)
 이상치 제거 민감도 (표준편차 배수) : {sor_std_ratio:.1f}
 바닥 분리 방식 : {floor_mode} ({'테이블 상판 등 비바닥 수평면 제외에 엄격' if floor_mode == 'AND' else '기본(논문 기준)'})
